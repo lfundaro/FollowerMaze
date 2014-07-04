@@ -4,7 +4,7 @@ package org.lfundaro.followermaze.events;
  *
  * @author Lorenzo
  */
-public class FollowEvent extends BaseEvent implements Event{
+public class FollowEvent extends Event {
 
     private long fromUser;
     private long toUser;

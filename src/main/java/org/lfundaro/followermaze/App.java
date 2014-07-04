@@ -1,12 +1,11 @@
 package org.lfundaro.followermaze;
 
+import java.io.IOException;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.lfundaro.followermaze.events.BroadcastEvent;
-import org.lfundaro.followermaze.events.ActionType;
 import org.lfundaro.followermaze.events.Event;
-import org.lfundaro.followermaze.events.EventFactory;
-import org.lfundaro.followermaze.events.MalformedEventException;
 
 /**
  * Hello world!
@@ -15,55 +14,29 @@ import org.lfundaro.followermaze.events.MalformedEventException;
 public class App {
 
     public static void main(String[] args) {
+        BlockingQueue<Client> clients = new ArrayBlockingQueue<Client>(30000, true);
+        BlockingQueue<Event> events = new ArrayBlockingQueue<Event>(100000, true);
+        BlockingQueue<Event> readyForDelivery = new ArrayBlockingQueue<Event>(1000, true);
+
         try {
-            Event event = EventFactory.buildEvent("2345|F|10|9");
-            System.out.println(event.toString());
-        } catch (MalformedEventException ex) {
-            System.out.println(ex.getMessage());
+            ClientListener clientListener = new ClientListener(9099, clients);
+            Thread clientListenerThread = new Thread(clientListener);
+            clientListenerThread.start();
+            
+            EventListener eventListener = new EventListener(9090, events);
+            Thread eventListenerThread = new Thread(eventListener);
+            eventListenerThread.start();
+            
+            Sorter sorter = new Sorter(events, readyForDelivery);
+            Thread sorterThread = new Thread(sorter);
+            sorterThread.start();
+            
+            Sender sender = new Sender(readyForDelivery, clients);
+            Thread senderThread = new Thread(sender);
+            senderThread.start();
+            
+        } catch (IOException ex) {
+            Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
         }
-
-//        //TODO catch control c signal 
-//        Thread t1 = new Thread(new Runnable() {
-//            public void run() {
-//            }
-//        });
-//        t1.start();
-//        Thread t2 = new Thread(new Runnable() {
-//            public void run() {
-//                Socket event_client_socket = null;
-//                ServerSocket server_event_socket = null;
-//                try {
-//                    event_client_socket = null;
-//                    server_event_socket = new ServerSocket(9090);
-//                    while (true) {
-//                        event_client_socket = server_event_socket.accept();
-//                    }
-//                } catch (IOException ex) {
-//                    Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
-//                } finally {
-//                    try {
-//                        if (event_client_socket != null) {
-//                            event_client_socket.close();
-//                        }
-//                        if (server_event_socket != null) {
-//                            server_event_socket.close();
-//                        }
-//                    } catch (IOException ex) {
-//                        Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
-//                    }
-//                }
-//
-//            }
-//        });
-//        t2.start();
-//
-//        try {
-//            t1.join();
-//            t2.join();
-//        } catch (InterruptedException ex) {
-//            Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
-//        }
-
-
     }
 }

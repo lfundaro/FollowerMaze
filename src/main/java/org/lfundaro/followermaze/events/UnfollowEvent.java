@@ -8,7 +8,7 @@ package org.lfundaro.followermaze.events;
  *
  * @author Lorenzo
  */
-public class UnfollowEvent extends BaseEvent implements Event {
+public class UnfollowEvent extends Event {
 
     private long fromUser;
     private long toUser;

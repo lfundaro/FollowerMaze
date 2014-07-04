@@ -17,9 +17,14 @@ public class Client {
     private Socket clientSocket;
     private LinkedList<Long> followers;
 
-    public Client(long id, Socket clientSocket, LinkedList<Long> followers) {
+    public Client(long id, Socket clientSocket) {
         this.id = id;
         this.clientSocket = clientSocket;
+        this.followers = new LinkedList();
+    }
+    
+    public Client(long id, LinkedList<Long> followers) {
+        this.id = id;
         this.followers = followers;
     }
 

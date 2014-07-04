@@ -8,7 +8,7 @@ package org.lfundaro.followermaze.events;
  *
  * @author Lorenzo
  */
-public class PrivateMessageEvent extends BaseEvent implements Event {
+public class PrivateMessageEvent extends Event {
 
     private long fromUser;
     private long toUser;

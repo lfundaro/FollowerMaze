@@ -8,7 +8,7 @@ package org.lfundaro.followermaze.events;
  *
  * @author Lorenzo
  */
-public class StatusUpdateEvent extends BaseEvent implements Event {
+public class StatusUpdateEvent extends Event {
 
     private long fromUser;
 

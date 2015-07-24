@@ -1,20 +1,17 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package org.lfundaro.followermaze;
 
 import java.net.Socket;
 import java.util.LinkedList;
 
 /**
- *
+ * Represents a Client connecting to the server. 
  * @author Lorenzo
  */
 public class Client {
     
     private long id;
     private Socket clientSocket;
+    //List of followers identifies by their id.
     private LinkedList<Long> followers;
 
     public Client(long id, Socket clientSocket) {

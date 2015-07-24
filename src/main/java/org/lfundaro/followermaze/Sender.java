@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package org.lfundaro.followermaze;
 
 import java.io.BufferedWriter;
@@ -24,7 +20,7 @@ import org.lfundaro.followermaze.events.StatusUpdateEvent;
 import org.lfundaro.followermaze.events.UnfollowEvent;
 
 /**
- *
+ * Sends notifications to clients.
  * @author Lorenzo
  */
 public class Sender implements Runnable {
@@ -32,6 +28,7 @@ public class Sender implements Runnable {
     private BlockingQueue<Event> readyForDelivery;
     private BlockingQueue<Client> clientQueue;
     private HashMap<Long, Client> clients;
+    private static final Logger logger = Logger.getLogger(Sender.class.getName());
 
     public Sender(BlockingQueue<Event> readyForDelivery, BlockingQueue<Client> clientQueue) {
         this.readyForDelivery = readyForDelivery;
@@ -42,13 +39,17 @@ public class Sender implements Runnable {
     public void run() {
         while (true) {
             try {
+                logger.finest("Update clients");
                 updateClients();
+                logger.finest("Waiting for events");
                 Event event = readyForDelivery.poll(500, TimeUnit.MILLISECONDS);
                 if (event != null) {
+                    logger.log(Level.FINEST, "Processing event with seq: {0}", String.valueOf(event.getSeq()));
                     processEvent(event);
                 }
+                logger.finest("Not event found in queue");
             } catch (InterruptedException ex) {
-                Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
+                logger.severe(ex.getMessage());
             }
         }
     }
@@ -71,6 +72,7 @@ public class Sender implements Runnable {
                 handleStatusUpdate((StatusUpdateEvent) event);
                 break;
             default:
+                logger.log(Level.INFO, "Event does not match any event type: {0}", event.toString());
                 break;
         }
     }
@@ -83,10 +85,14 @@ public class Sender implements Runnable {
     }
 
     private void addFollower(FollowEvent followEvent) {
+        logger.log(Level.INFO, "Client {0} now follows {1}", 
+                new Object[]{String.valueOf(followEvent.getFromUser()), String.valueOf(followEvent.getToUser())});
         if (clients.containsKey(followEvent.getToUser())) {
+            logger.finest("Client existed before. Updating his followers");
             Client client = clients.get(followEvent.getToUser());
             client.getFollowers().add(followEvent.getFromUser());
         } else {
+            logger.finest("Client did not exist. Creating a new one");
             LinkedList<Long> followers = new LinkedList();
             followers.add(followEvent.getFromUser());
             clients.put(followEvent.getToUser(), new Client(followEvent.getToUser(), followers));
@@ -98,10 +104,19 @@ public class Sender implements Runnable {
     }
 
     private void removeFollower(UnfollowEvent event) {
-        clients.get(event.getToUser()).getFollowers().remove(event.getFromUser());
+        if (clients.containsKey(event.getToUser())) {
+            //FIXME this remove is O(n). Could be improved by inserting in order
+            //and then doing a binary search
+            clients.get(event.getToUser()).getFollowers().remove(event.getFromUser());
+            logger.log(Level.INFO, "Remove follower {0} from {1}", 
+                    new Object[]{String.valueOf(event.getFromUser()), String.valueOf(event.getToUser())});
+        } else {
+            logger.finest("Client did not exist. No remove action executed");
+        }
     }
 
     private void handleBroadcast(BroadcastEvent broadcastEvent) {
+        logger.log(Level.INFO, "Broadcasting event: {0}", broadcastEvent.toString());
         for (Client client : clients.values()) {
             notifyClient(broadcastEvent, client);
         }
@@ -109,6 +124,8 @@ public class Sender implements Runnable {
 
     private void handlePrivateMsg(PrivateMessageEvent privateMessageEvent) {
         if (clients.containsKey(privateMessageEvent.getToUser())) {
+            logger.log(Level.INFO, "Client {0} sends private message to {1}", 
+                    new Object[]{String.valueOf(privateMessageEvent.getFromUser()), String.valueOf(privateMessageEvent.getToUser())});
             Client receiver = clients.get(privateMessageEvent.getToUser());
             notifyClient(privateMessageEvent, receiver);
         }
@@ -116,6 +133,7 @@ public class Sender implements Runnable {
 
     private void handleStatusUpdate(StatusUpdateEvent statusUpdateEvent) {
         if (clients.containsKey(statusUpdateEvent.getFromUser())) {
+            logger.log(Level.INFO, "Client {0} updates his status", String.valueOf(statusUpdateEvent.getFromUser()));
             LinkedList<Long> followers = clients.get(statusUpdateEvent.getFromUser()).getFollowers();
             for (Long clientId : followers) {
                 if (clients.containsKey(clientId)) {
@@ -133,8 +151,9 @@ public class Sender implements Runnable {
                 Writer out = new BufferedWriter(new OutputStreamWriter(so.getOutputStream()));
                 out.write(event.toString() + "\n");
                 out.flush();
+                logger.log(Level.INFO, "Client {0} notified", String.valueOf(receiver.getId()));
             } catch (IOException ex) {
-                Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
+                logger.severe(ex.getMessage());
             }
         }
     }
@@ -144,7 +163,9 @@ public class Sender implements Runnable {
             ArrayList<Client> newClients = new ArrayList<Client>();
             clientQueue.drainTo(newClients);
             for (Client c : newClients) {
+                logger.log(Level.INFO, "Client {0} reported for notifications", String.valueOf(c.getId()));
                 if (clients.containsKey(c.getId())) {
+                    logger.finest("Client did exist in clients hashmap");
                     // If a client has followers but has no
                     // client connected to receive notifications (Socket) 
                     // then its entry must be updated instead 
@@ -153,9 +174,34 @@ public class Sender implements Runnable {
                     c.setFollowers(oldClient.getFollowers());
                     clients.put(c.getId(), c);
                 } else {
+                    logger.finest("Client did not exist in clients hashmap");
                     clients.put(c.getId(), c);
                 }
             }
         }
+    }
+
+    public BlockingQueue<Event> getReadyForDelivery() {
+        return readyForDelivery;
+    }
+
+    public void setReadyForDelivery(BlockingQueue<Event> readyForDelivery) {
+        this.readyForDelivery = readyForDelivery;
+    }
+
+    public BlockingQueue<Client> getClientQueue() {
+        return clientQueue;
+    }
+
+    public void setClientQueue(BlockingQueue<Client> clientQueue) {
+        this.clientQueue = clientQueue;
+    }
+
+    public HashMap<Long, Client> getClients() {
+        return clients;
+    }
+
+    public void setClients(HashMap<Long, Client> clients) {
+        this.clients = clients;
     }
 }

@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package org.lfundaro.followermaze;
 
 import java.util.LinkedList;
@@ -12,7 +8,7 @@ import java.util.logging.Logger;
 import org.lfundaro.followermaze.events.Event;
 
 /**
- *
+ * Sorts events and enqueues them so the Sender sends them to clients in order.
  * @author Lorenzo
  */
 public class Sorter implements Runnable {
@@ -21,6 +17,7 @@ public class Sorter implements Runnable {
     private int currentSeq;
     private BlockingQueue<Event> eventQueue;
     private BlockingQueue<Event> readyForDelivery;
+    private static final Logger logger = Logger.getLogger(Sorter.class.getName());
 
     public Sorter(BlockingQueue<Event> eventQueue, BlockingQueue<Event> readyForDelivery) {
         this.msgBuffer = new LinkedList<Event>();
@@ -39,14 +36,16 @@ public class Sorter implements Runnable {
                 insertMessage(event);
                 if (checkForFlush()) {
                     long n = currentSeq - msgBuffer.getFirst().getSeq();
+                    logger.log(Level.INFO, "Found {0} messages to flush", String.valueOf(n));
                     while (n > 0) {
-                        readyForDelivery.add((Event) msgBuffer.removeFirst());
+                        Event e = (Event) msgBuffer.removeFirst();
+                        while(!readyForDelivery.offer(e)){}
                         n--;
                     }
                 }
             }
             } catch (InterruptedException ex) {
-                Logger.getLogger(Sorter.class.getName()).log(Level.SEVERE, null, ex);
+                logger.severe(ex.getMessage());
             }
         }
     }
@@ -65,18 +64,53 @@ public class Sorter implements Runnable {
 
     private void insertMessage(Event msg) {
         if (msgBuffer.isEmpty()) {
+            logger.finest("Message Buffer was empty. Inserting new message");
             msgBuffer.add(msg);
         } else {
             for (int i = 0; i < msgBuffer.size(); i++) {
                 if (msg.getSeq() < msgBuffer.get(i).getSeq()) {
                     msgBuffer.add(i, msg);
+                    logger.finest("Message inserted");
                     return;
                 } else if (msg.getSeq() > msgBuffer.get(i).getSeq()) {
                     continue;
                 }
             }
+            logger.finest("Message id is the greatest from all");
             //in case msg seq is greater than any other msg in buffer
             msgBuffer.addLast(msg);
         }
+    }
+
+    public LinkedList<Event> getMsgBuffer() {
+        return msgBuffer;
+    }
+
+    public void setMsgBuffer(LinkedList<Event> msgBuffer) {
+        this.msgBuffer = msgBuffer;
+    }
+
+    public int getCurrentSeq() {
+        return currentSeq;
+    }
+
+    public void setCurrentSeq(int currentSeq) {
+        this.currentSeq = currentSeq;
+    }
+
+    public BlockingQueue<Event> getEventQueue() {
+        return eventQueue;
+    }
+
+    public void setEventQueue(BlockingQueue<Event> eventQueue) {
+        this.eventQueue = eventQueue;
+    }
+
+    public BlockingQueue<Event> getReadyForDelivery() {
+        return readyForDelivery;
+    }
+
+    public void setReadyForDelivery(BlockingQueue<Event> readyForDelivery) {
+        this.readyForDelivery = readyForDelivery;
     }
 }
